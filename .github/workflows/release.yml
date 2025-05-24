@@ -74,17 +74,15 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt update
           sudo apt install -y meson ninja-build nasm ffmpeg libsdl2-2.0-0 \
              libsdl2-dev libavcodec-dev libavdevice-dev libavformat-dev \
              libavutil-dev libswresample-dev libusb-1.0-0 libusb-1.0-0-dev \
              libv4l-dev
-
       - name: Test
         run: release/test_client.sh
 
   build-linux-x86_64:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       - name: Check architecture
         run: |
@@ -94,18 +92,15 @@ jobs:
                 echo "Unexpected architecture: $arch" >&2
                 exit 1
             fi
-
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
-          sudo apt update
           sudo apt install -y meson ninja-build nasm ffmpeg libsdl2-2.0-0 \
              libsdl2-dev libavcodec-dev libavdevice-dev libavformat-dev \
              libavutil-dev libswresample-dev libusb-1.0-0 libusb-1.0-0-dev \
              libv4l-dev
-
       - name: Build
         run: release/build_linux.sh x86_64
 
@@ -116,12 +111,52 @@ jobs:
             mkdir dist-tar
             cd dist-tar
             tar -C .. -cvf dist.tar.gz dist/
-
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: build-linux-x86_64-intermediate
           path: release/work/build-linux-x86_64/dist-tar/
+
+  build-linux-aarch64:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Check architecture
+        run: |
+            arch=$(uname -m)
+            if [[ "$arch" != aarch64 ]]
+            then
+                echo "Unexpected architecture: $arch" >&2
+                exit 1
+            fi
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      # - name: Update sources list
+      #   run: |
+      #     sudo sed -i 's|http://ports.ubuntu.com/ubuntu-ports|http://archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y meson ninja-build nasm ffmpeg libsdl2-2.0-0 \
+              libsdl2-dev libavcodec-dev libavdevice-dev libavformat-dev \
+              libavutil-dev libswresample-dev libusb-1.0-0 libusb-1.0-0-dev \
+              libv4l-dev --fix-missing
+      - name: Build
+        run: release/build_linux.sh aarch64
+
+      # upload-artifact does not preserve permissions
+      - name: Tar
+        run: |
+            cd release/work/build-linux-aarch64
+            mkdir dist-tar
+            cd dist-tar
+            tar -C .. -cvf dist.tar.gz dist/
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-linux-aarch64-intermediate
+          path: release/work/build-linux-aarch64/dist-tar/
 
   build-win32:
     runs-on: ubuntu-latest
@@ -131,11 +166,12 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt update
           sudo apt install -y meson ninja-build nasm ffmpeg libsdl2-2.0-0 \
              libsdl2-dev libavcodec-dev libavdevice-dev libavformat-dev \
              libavutil-dev libswresample-dev libusb-1.0-0 libusb-1.0-0-dev \
              mingw-w64 mingw-w64-tools libz-mingw-w64-dev
+      - name: Workaround for old meson version run by Github Actions
+        run: sed -i 's/^pkg-config/pkgconfig/' cross_win32.txt
 
       - name: Build
         run: release/build_windows.sh 32
@@ -147,7 +183,6 @@ jobs:
             mkdir dist-tar
             cd dist-tar
             tar -C .. -cvf dist.tar.gz dist/
-
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -162,11 +197,12 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt update
           sudo apt install -y meson ninja-build nasm ffmpeg libsdl2-2.0-0 \
              libsdl2-dev libavcodec-dev libavdevice-dev libavformat-dev \
              libavutil-dev libswresample-dev libusb-1.0-0 libusb-1.0-0-dev \
              mingw-w64 mingw-w64-tools libz-mingw-w64-dev
+      - name: Workaround for old meson version run by Github Actions
+        run: sed -i 's/^pkg-config/pkgconfig/' cross_win64.txt
 
       - name: Build
         run: release/build_windows.sh 64
@@ -178,7 +214,6 @@ jobs:
             mkdir dist-tar
             cd dist-tar
             tar -C .. -cvf dist.tar.gz dist/
-
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -196,7 +231,6 @@ jobs:
                 echo "Unexpected architecture: $arch" >&2
                 exit 1
             fi
-
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -204,15 +238,7 @@ jobs:
         run: |
             brew install meson ninja nasm libiconv zlib automake autoconf \
                 libtool
-
       - name: Build
-        env:
-          # the default Xcode (and macOS SDK) version can be found at
-          # <https://github.com/actions/runner-images/blob/main/images/macos/macos-15-Readme.md#xcode>
-          #
-          # then the minimal supported deployment target of that macOS SDK can be found at
-          # <https://developer.apple.com/support/xcode/#minimum-requirements>
-          MACOSX_DEPLOYMENT_TARGET: 10.13
         run: release/build_macos.sh aarch64
 
       # upload-artifact does not preserve permissions
@@ -222,7 +248,6 @@ jobs:
             mkdir dist-tar
             cd dist-tar
             tar -C .. -cvf dist.tar.gz dist/
-
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -240,7 +265,6 @@ jobs:
                 echo "Unexpected architecture: $arch" >&2
                 exit 1
             fi
-
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -249,13 +273,6 @@ jobs:
              # autoconf and libtool are already installed on macos-13
 
       - name: Build
-        env:
-          # the default Xcode (and macOS SDK) version can be found at
-          # <https://github.com/actions/runner-images/blob/main/images/macos/macos-13-Readme.md#xcode>
-          #
-          # then the minimal supported deployment target of that macOS SDK can be found at
-          # <https://developer.apple.com/support/xcode/#minimum-requirements>
-          MACOSX_DEPLOYMENT_TARGET: 10.13
         run: release/build_macos.sh x86_64
 
       # upload-artifact does not preserve permissions
@@ -265,7 +282,6 @@ jobs:
             mkdir dist-tar
             cd dist-tar
             tar -C .. -cvf dist.tar.gz dist/
-
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -298,7 +314,6 @@ jobs:
         run: |
             cd release/work/build-linux-x86_64
             tar xf dist-tar/dist.tar.gz
-
       - name: Package
         run: release/package_client.sh linux-x86_64 tar.gz
 
@@ -306,6 +321,41 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release-linux-x86_64
+          path: release/output/
+
+  package-linux-aarch64:
+    needs:
+      - build-scrcpy-server
+      - build-linux-aarch64
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download scrcpy-server
+        uses: actions/download-artifact@v4
+        with:
+          name: scrcpy-server
+          path: release/work/build-server/server/
+
+      - name: Download build-linux-aarch64
+        uses: actions/download-artifact@v4
+        with:
+          name: build-linux-aarch64-intermediate
+          path: release/work/build-linux-aarch64/dist-tar/
+
+      # upload-artifact does not preserve permissions
+      - name: Detar
+        run: |
+            cd release/work/build-linux-aarch64
+            tar xf dist-tar/dist.tar.gz
+      - name: Package
+        run: release/package_client.sh linux-aarch64 tar.gz
+
+      - name: Upload release
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-linux-aarch64
           path: release/output/
 
   package-win32:
@@ -334,7 +384,6 @@ jobs:
         run: |
             cd release/work/build-win32
             tar xf dist-tar/dist.tar.gz
-
       - name: Package
         run: release/package_client.sh win32 zip
 
@@ -370,7 +419,6 @@ jobs:
         run: |
             cd release/work/build-win64
             tar xf dist-tar/dist.tar.gz
-
       - name: Package
         run: release/package_client.sh win64 zip
 
@@ -406,7 +454,6 @@ jobs:
         run: |
             cd release/work/build-macos-aarch64
             tar xf dist-tar/dist.tar.gz
-
       - name: Package
         run: release/package_client.sh macos-aarch64 tar.gz
 
@@ -442,7 +489,6 @@ jobs:
         run: |
             cd release/work/build-macos-x86_64
             tar xf dist-tar/dist.tar.gz
-
       - name: Package
         run: release/package_client.sh macos-x86_64 tar.gz
 
@@ -456,6 +502,7 @@ jobs:
     needs:
       - build-scrcpy-server
       - package-linux-x86_64
+      - package-linux-aarch64
       - package-win32
       - package-win64
       - package-macos-aarch64
@@ -475,6 +522,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: release-linux-x86_64
+          path: release/output/
+
+      - name: Download release-linux-aarch64
+        uses: actions/download-artifact@v4
+        with:
+          name: release-linux-aarch64
           path: release/output/
 
       - name: Download release-win32
